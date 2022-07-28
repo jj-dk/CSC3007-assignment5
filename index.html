@@ -1,0 +1,140 @@
+<!-- Create geospatial visualization -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CSC3007 Information Visualization Assignment 1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- INCLUDING JQUERY-->
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.8.0/leaflet.css"
+    />
+    <style>
+      #map {
+        width: 1000px;
+        height: 600px;
+      }
+
+      .legend {
+        background-color: “black”;
+        line-height: 25px;
+        color: #555;
+        width: auto;
+      }
+
+      .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.8.0/leaflet.js"></script>
+    <script type="text/javascript">
+      let tiles = new L.tileLayer(
+        "https://maps-{s}.onemap.sg/v3/Default/{z}/{x}/{y}.png",
+        {
+          detectRetina: true,
+          maxZoom: 18,
+          minZoom: 11,
+          //Do not remove this attribution
+          attribution:
+            '<img src="https://docs.onemap.sg/maps/images/oneMap64-01.png" style="height:20px;width:20px;">' +
+            'New OneMap | Map data © contributors, <a href="http://SLA.gov.sg">Singapore Land Authority</a>',
+        }
+      );
+
+      let map = new L.Map("map", {
+        center: [1.347833, 103.809357],
+        zoom: 11,
+        maxBounds: L.latLngBounds(L.latLng(1.1, 103.5), L.latLng(1.5, 104.3)),
+      }).addLayer(tiles);
+
+      function getColorbyPSI(psi) {
+        if (psi < 35) {
+          return "green";
+        } else if (psi < 45) {
+          return "blue";
+        } else if (psi < 55) {
+          return "yellow";
+        } else if (psi < 65) {
+          return "orange";
+        } else {
+          return "red";
+        }
+      }
+
+      $(document).ready(function () {
+        // fetch data from json file
+        $.getJSON(
+          "https://api.data.gov.sg/v1/environment/psi",
+          function (data) {
+            var psiData = data.items[0].readings.psi_twenty_four_hourly;
+            console.log(psiData);
+
+            // iterate through objects
+            $.each(psiData, function (key, value) {
+              //construct data from json object
+              var region_name = key;
+              var psi_value = psiData[key];
+              var region_metadata = data["region_metadata"];
+              var region_lat_lng = null;
+              for (var i = 0; i < region_metadata.length; i++) {
+                if (region_metadata[i]["name"] == region_name) {
+                  region_lat_lng = region_metadata[i]["label_location"];
+                  break;
+                }
+              }
+
+              const position = new L.LatLng(
+                region_lat_lng["latitude"],
+                region_lat_lng["longitude"]
+              );
+              var circleMarker = L.circleMarker(position, {
+                color: "#FF0000",
+                fillColor: getColorbyPSI(psi_value),
+                fillOpacity: 0.4,
+              });
+              circleMarker.setRadius(30);
+              circleMarker.addTo(map);
+
+              var psi_value = L.divIcon({
+                className: "psi-value",
+                html: psi_value,
+                iconAnchor: [10, 8],
+              });
+              L.marker(
+                [region_lat_lng["latitude"], region_lat_lng["longitude"]],
+                { icon: psi_value }
+              ).addTo(map);
+            });
+          }
+        );
+
+        // add legend to the map
+        var legend = L.control({ position: "bottomright" });
+        legend.onAdd = function (map) {
+          var div = L.DomUtil.create("div", "info legend"),
+            grades = [0, 35, 45, 55, 65],
+            labels = [];
+          for (var i = 0; i < grades.length; i++) {
+            div.innerHTML +=
+              '<i style="background:' +
+              getColorbyPSI(grades[i] + 1) +
+              '"></i> ' +
+              grades[i] +
+              (grades[i + 1] ? "&ndash;" + grades[i + 1] + "<br>" : "+");
+          }
+          return div;
+        };
+        legend.addTo(map);
+      });
+    </script>
+  </body>
+</html>
